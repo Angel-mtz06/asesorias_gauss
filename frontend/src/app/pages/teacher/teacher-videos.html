@@ -1,0 +1,168 @@
+<div class="mx-auto max-w-6xl p-4 sm:p-6">
+  <div class="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+    <div>
+      <h1 class="font-display text-2xl font-bold">Mis videos</h1>
+      <p class="mt-0.5 text-sm text-ink-muted">{{ videos().length }} videoclases en total.</p>
+    </div>
+    <a routerLink="/profesor/videos/nuevo" class="btn-primary"><app-nav-icon name="plus" /> Nuevo video</a>
+  </div>
+
+  <!-- Filtros -->
+  <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+    <label class="flex flex-1 items-center gap-2 rounded-lg border border-line-strong bg-white px-3 py-2 text-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft">
+      <app-nav-icon name="search" class="text-ink-subtle" />
+      <span class="sr-only">Buscar video</span>
+      <input
+        type="search"
+        name="search"
+        autocomplete="off"
+        class="w-full bg-transparent placeholder:text-ink-subtle focus:outline-none"
+        placeholder="Buscar por título o unidad…"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+    </label>
+    <label class="sr-only" for="subject-filter">Materia</label>
+    <select id="subject-filter" class="field-input md:!w-56" (change)="onSubject($any($event.target).value)">
+      <option value="all" [selected]="subjectId() === 'all'">Todas las materias</option>
+      @for (s of subjects(); track s.id) {
+        <option [value]="s.id" [selected]="subjectId() === s.id">{{ s.name }}</option>
+      }
+    </select>
+    <div class="flex shrink-0 overflow-hidden rounded-lg border border-line text-xs" role="group" aria-label="Estado">
+      @for (opt of statusOptions; track opt.id) {
+        <button
+          type="button"
+          class="px-3 py-2 transition-colors"
+          [class]="status() === opt.id ? 'bg-primary font-semibold text-white' : 'bg-white text-ink hover:bg-surface'"
+          [attr.aria-pressed]="status() === opt.id"
+          (click)="status.set(opt.id)"
+        >
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-line bg-accent-soft p-4 text-sm text-accent" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" class="btn-ghost !py-1.5 text-xs" (click)="load()">Reintentar</button>
+    </div>
+  }
+
+  <div class="card overflow-hidden">
+    @if (loading()) {
+      <div class="space-y-4 p-4">
+        @for (i of [1, 2, 3, 4, 5]; track i) {
+          <div class="flex items-center gap-3"><div class="skeleton h-10 w-16"></div><div class="skeleton h-3 flex-1"></div><div class="skeleton h-3 w-20"></div></div>
+        }
+      </div>
+    } @else if (filtered().length === 0) {
+      <div class="p-10 text-center">
+        @if (videos().length === 0) {
+          <p class="mb-1 font-display text-base font-semibold">Aún no tienes videos</p>
+          <p class="mb-4 text-sm text-ink-muted">Sube tu primera videoclase con una URL de prueba.</p>
+          <a routerLink="/profesor/videos/nuevo" class="btn-primary">Subir video</a>
+        } @else {
+          <p class="mb-3 text-sm text-ink-muted">Ningún video coincide con los filtros.</p>
+          <button type="button" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+        }
+      </div>
+    } @else {
+      <!-- Tabla (escritorio) -->
+      <table class="hidden w-full text-left text-sm md:table">
+        <thead class="border-b border-line bg-surface text-xs text-ink-muted">
+          <tr>
+            <th scope="col" class="px-4 py-2.5 font-medium">Video</th>
+            <th scope="col" class="px-3 py-2.5 font-medium">Duración</th>
+            <th scope="col" class="px-3 py-2.5 font-medium">Estado</th>
+            <th scope="col" class="px-3 py-2.5 text-right font-medium">Vistas</th>
+            <th scope="col" class="px-3 py-2.5 font-medium">Actualizado</th>
+            <th scope="col" class="px-4 py-2.5 text-right font-medium"><span class="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line">
+          @for (v of filtered(); track v.id) {
+            <tr class="hover:bg-surface/60">
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-10 w-16 shrink-0 items-center justify-center rounded-md" [style.background-color]="v.unit?.subject?.color" aria-hidden="true">
+                    <svg width="9" height="11" viewBox="0 0 10 12" fill="none"><path d="M1 1l8 5-8 5V1z" fill="white" /></svg>
+                  </span>
+                  <div class="min-w-0">
+                    <a [routerLink]="[v.id, 'editar']" class="block truncate font-medium text-ink hover:underline">{{ v.title }}</a>
+                    <p class="truncate text-xs text-ink-subtle">
+                      {{ v.unit?.subject?.name }} · Unidad {{ v.unit?.number }}: {{ v.unit?.title }}
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td class="tabular px-3 py-3 text-ink-muted">{{ formatDuration(v.durationSeconds) }}</td>
+              <td class="px-3 py-3">
+                <button
+                  type="button"
+                  class="rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-50"
+                  [class]="v.status === 'published' ? 'bg-success-soft text-success-text' : 'bg-surface text-ink-muted ring-1 ring-line'"
+                  [disabled]="toggling() === v.id"
+                  [title]="v.status === 'published' ? 'Pasar a borrador' : 'Publicar'"
+                  (click)="toggleStatus(v)"
+                >
+                  {{ v.status === 'published' ? 'Publicado' : 'Borrador' }}
+                </button>
+              </td>
+              <td class="tabular px-3 py-3 text-right text-ink-muted">{{ v.views }}</td>
+              <td class="px-3 py-3 text-xs text-ink-subtle">{{ v.updatedAt | date: 'd MMM y' }}</td>
+              <td class="px-4 py-3">
+                <div class="flex justify-end gap-1">
+                  <a [routerLink]="['/clase', v.id]" class="rounded-md p-2 text-ink-subtle hover:bg-surface hover:text-ink" [attr.aria-label]="'Ver ' + v.title" title="Ver como estudiante">
+                    <app-nav-icon name="eye" />
+                  </a>
+                  <a [routerLink]="[v.id, 'editar']" class="rounded-md p-2 text-ink-subtle hover:bg-surface hover:text-ink" [attr.aria-label]="'Editar ' + v.title" title="Editar">
+                    <app-nav-icon name="edit" />
+                  </a>
+                  <button type="button" class="rounded-md p-2 text-ink-subtle hover:bg-accent-soft hover:text-accent" [attr.aria-label]="'Eliminar ' + v.title" title="Eliminar" (click)="toDelete.set(v)">
+                    <app-nav-icon name="trash" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Tarjetas (móvil) -->
+      <ul class="divide-y divide-line md:hidden">
+        @for (v of filtered(); track v.id) {
+          <li class="flex gap-3 p-4">
+            <span class="flex h-12 w-20 shrink-0 items-center justify-center rounded-md" [style.background-color]="v.unit?.subject?.color" aria-hidden="true">
+              <svg width="9" height="11" viewBox="0 0 10 12" fill="none"><path d="M1 1l8 5-8 5V1z" fill="white" /></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+              <a [routerLink]="[v.id, 'editar']" class="block truncate text-sm font-medium text-ink">{{ v.title }}</a>
+              <p class="truncate text-xs text-ink-subtle">{{ v.unit?.subject?.name }} · U{{ v.unit?.number }}</p>
+              <div class="mt-2 flex items-center gap-2 text-xs">
+                <span class="rounded-full px-2 py-0.5 text-[11px] font-medium" [class]="v.status === 'published' ? 'bg-success-soft text-success-text' : 'bg-surface text-ink-muted'">
+                  {{ v.status === 'published' ? 'Publicado' : 'Borrador' }}
+                </span>
+                <span class="tabular text-ink-subtle">{{ formatDuration(v.durationSeconds) }} · {{ v.views }} vistas</span>
+                <button type="button" class="ml-auto rounded-md p-1.5 text-ink-subtle hover:text-accent" [attr.aria-label]="'Eliminar ' + v.title" (click)="toDelete.set(v)">
+                  <app-nav-icon name="trash" />
+                </button>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>
+
+<app-confirm-dialog
+  [open]="!!toDelete()"
+  title="Eliminar video"
+  [message]="'Se eliminará «' + (toDelete()?.title ?? '') + '» de forma permanente. Los estudiantes ya no podrán verlo.'"
+  [busy]="deleting()"
+  (confirm)="confirmDelete()"
+  (cancel)="toDelete.set(null)"
+/>

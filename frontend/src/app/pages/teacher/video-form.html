@@ -1,0 +1,259 @@
+<div class="mx-auto max-w-6xl p-4 sm:p-6">
+  <a routerLink="/profesor/videos" class="mb-3 inline-block text-xs text-secondary-text hover:underline">← Mis videos</a>
+  <div class="mb-6">
+    <h1 class="font-display text-2xl font-bold">{{ isEdit() ? 'Editar video' : 'Subir video' }}</h1>
+    <p class="mt-0.5 text-sm text-ink-muted">
+      Pega la URL del video (mp4, webm o YouTube). Mientras grabas tus clases puedes usar un video de prueba.
+    </p>
+  </div>
+
+  @if (serverError()) {
+    <div class="mb-5 rounded-xl border border-accent-line bg-accent-soft p-4 text-sm text-accent" role="alert">{{ serverError() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <!-- Columna principal -->
+    <div class="space-y-5">
+      <section class="card space-y-5 p-5">
+        <div class="flex flex-col gap-2">
+          <label class="field-label" for="title">Título de la clase</label>
+          <input
+            id="title"
+            class="field-input"
+            formControlName="title"
+            autocomplete="off"
+            placeholder="Ej. Regla de la cadena, paso a paso…"
+            [attr.aria-invalid]="showError('title')"
+            aria-describedby="title-error"
+          />
+          @if (showError('title')) {
+            <p id="title-error" class="field-error">Escribe un título de al menos 3 caracteres.</p>
+          }
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="field-label" for="videoUrl">URL del video</label>
+          <input
+            id="videoUrl"
+            type="url"
+            inputmode="url"
+            class="field-input"
+            formControlName="videoUrl"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://…/clase.mp4"
+            [attr.aria-invalid]="showError('videoUrl')"
+            aria-describedby="url-help url-error"
+          />
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="field-help" for="test-video">¿Sin video aún?</label>
+            <select id="test-video" class="field-input !w-auto !py-1 text-xs" (change)="useTestVideo($any($event.target).value); $any($event.target).value = ''">
+              <option value="">Usar un video de prueba…</option>
+              @for (t of testVideos; track t.url) {
+                <option [value]="t.url">{{ t.label }}</option>
+              }
+            </select>
+          </div>
+          <p id="url-help" class="field-help">Acepta enlaces directos a archivos de video o enlaces de YouTube.</p>
+          @if (showError('videoUrl')) {
+            <p id="url-error" class="field-error">La URL debe empezar con http:// o https://</p>
+          }
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div class="flex flex-col gap-2">
+            <label class="field-label" for="subjectId">Materia</label>
+            <select
+              id="subjectId"
+              class="field-input"
+              formControlName="subjectId"
+              [attr.aria-invalid]="showError('subjectId')"
+              aria-describedby="subject-error"
+            >
+              <option [ngValue]="null" disabled>Elige una materia…</option>
+              @for (group of subjectsByLevel(); track group.level) {
+                <optgroup [label]="levelLabel[group.level]">
+                  @for (s of group.items; track s.id) {
+                    <option [ngValue]="s.id">{{ s.name }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+            @if (showError('subjectId')) {
+              <p id="subject-error" class="field-error">Elige la materia de la clase.</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="field-label" for="unitId">Unidad</label>
+            <select
+              id="unitId"
+              class="field-input"
+              formControlName="unitId"
+              [attr.aria-invalid]="showError('unitId')"
+              aria-describedby="unit-error"
+            >
+              <option [ngValue]="null" disabled>
+                {{ form.controls.subjectId.value ? 'Elige una unidad…' : 'Primero elige la materia' }}
+              </option>
+              @for (u of units(); track u.id) {
+                <option [ngValue]="u.id">Unidad {{ u.number }}: {{ u.title }}</option>
+              }
+            </select>
+            @if (showError('unitId')) {
+              <p id="unit-error" class="field-error">Elige la unidad o crea una nueva.</p>
+            }
+            @if (form.controls.subjectId.value) {
+              <div class="flex gap-2">
+                <label class="sr-only" for="new-unit">Nueva unidad</label>
+                <input
+                  id="new-unit"
+                  class="field-input !py-1.5 text-xs"
+                  placeholder="Nueva unidad…"
+                  autocomplete="off"
+                  [value]="newUnitTitle()"
+                  (input)="newUnitTitle.set($any($event.target).value)"
+                  (keydown.enter)="$event.preventDefault(); createUnit()"
+                />
+                <button
+                  type="button"
+                  class="btn-ghost shrink-0 !px-3 !py-1.5 text-xs"
+                  [disabled]="newUnitTitle().trim().length < 2 || creatingUnit()"
+                  (click)="createUnit()"
+                >
+                  {{ creatingUnit() ? 'Creando…' : 'Crear' }}
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="field-label" for="summary">Resumen</label>
+          <textarea
+            id="summary"
+            class="field-input min-h-28 resize-y"
+            formControlName="summary"
+            placeholder="Qué aprenderá el estudiante y qué debe hacer al terminar…"
+            aria-describedby="summary-help"
+          ></textarea>
+          <p id="summary-help" class="field-help">Se muestra en la pestaña «Resumen» del reproductor.</p>
+        </div>
+      </section>
+
+      <!-- Materiales -->
+      <section class="card p-5" aria-labelledby="materials-title">
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <h2 id="materials-title" class="font-display text-sm font-semibold">Material descargable</h2>
+            <p class="field-help">PDFs, hojas de práctica o enlaces de apoyo.</p>
+          </div>
+          <button type="button" class="btn-ghost !px-3 !py-1.5 text-xs" (click)="addMaterial()">
+            <app-nav-icon name="plus" /> Agregar
+          </button>
+        </div>
+        <div formArrayName="materials" class="space-y-3">
+          @for (m of materials.controls; track m; let i = $index) {
+            <div [formGroupName]="i" class="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto] sm:items-start">
+              <div>
+                <label class="sr-only" [for]="'mat-title-' + i">Nombre del material {{ i + 1 }}</label>
+                <input
+                  [id]="'mat-title-' + i"
+                  class="field-input"
+                  formControlName="title"
+                  placeholder="Apuntes de la clase (PDF)…"
+                  [attr.aria-invalid]="m.controls.title.invalid && (m.controls.title.touched || submitted())"
+                />
+              </div>
+              <div>
+                <label class="sr-only" [for]="'mat-url-' + i">URL del material {{ i + 1 }}</label>
+                <input
+                  [id]="'mat-url-' + i"
+                  type="url"
+                  class="field-input"
+                  formControlName="url"
+                  spellcheck="false"
+                  placeholder="https://…/apuntes.pdf"
+                  [attr.aria-invalid]="m.controls.url.invalid && (m.controls.url.touched || submitted())"
+                />
+                @if (m.controls.url.invalid && (m.controls.url.touched || submitted())) {
+                  <p class="field-error mt-1">URL inválida.</p>
+                }
+              </div>
+              <button type="button" class="rounded-md p-2.5 text-ink-subtle hover:bg-accent-soft hover:text-accent" [attr.aria-label]="'Quitar material ' + (i + 1)" (click)="removeMaterial(i)">
+                <app-nav-icon name="trash" />
+              </button>
+            </div>
+          } @empty {
+            <p class="rounded-lg border border-dashed border-line-strong p-4 text-center text-xs text-ink-subtle">Sin materiales.</p>
+          }
+        </div>
+      </section>
+    </div>
+
+    <!-- Columna lateral -->
+    <aside class="space-y-5 lg:sticky lg:top-6 lg:self-start">
+      <section class="card overflow-hidden" aria-labelledby="preview-title">
+        <h2 id="preview-title" class="sr-only">Vista previa</h2>
+        @if (previewUrl()) {
+          <app-video-player [src]="previewUrl()" [maxHeight]="null" title="Vista previa" (durationDetected)="onDuration($event)" />
+        } @else {
+          <div class="flex aspect-video flex-col items-center justify-center gap-2 bg-night px-6 text-center">
+            <app-nav-icon name="video" class="text-white/60" />
+            <p class="text-xs text-white/70">La vista previa aparece al pegar una URL válida.</p>
+          </div>
+        }
+        <div class="space-y-4 p-4">
+          <div class="flex flex-col gap-2">
+            <label class="field-label" for="duration">Duración (mm:ss)</label>
+            <div class="flex gap-2">
+              <input
+                id="duration"
+                class="field-input tabular"
+                formControlName="duration"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="12:30"
+                [attr.aria-invalid]="showError('duration')"
+                aria-describedby="duration-error"
+              />
+              @if (detectedDuration() !== null) {
+                <button type="button" class="btn-ghost shrink-0 !px-3 text-xs" (click)="applyDetected()" [title]="'Duración del archivo: ' + detectedLabel()">
+                  Usar {{ detectedLabel() }}
+                </button>
+              }
+            </div>
+            @if (showError('duration')) {
+              <p id="duration-error" class="field-error">Indica la duración en formato mm:ss, por ejemplo 08:42.</p>
+            }
+          </div>
+
+          <fieldset class="flex flex-col gap-2">
+            <legend class="field-label mb-2">Estado</legend>
+            <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 has-[:checked]:border-primary has-[:checked]:bg-primary-tint">
+              <input type="radio" formControlName="status" value="draft" class="mt-0.5 accent-primary" />
+              <span>
+                <span class="block text-sm font-medium text-ink">Borrador</span>
+                <span class="block text-xs text-ink-subtle">Solo tú lo ves.</span>
+              </span>
+            </label>
+            <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 has-[:checked]:border-primary has-[:checked]:bg-primary-tint">
+              <input type="radio" formControlName="status" value="published" class="mt-0.5 accent-primary" />
+              <span>
+                <span class="block text-sm font-medium text-ink">Publicado</span>
+                <span class="block text-xs text-ink-subtle">Visible para los estudiantes en el temario.</span>
+              </span>
+            </label>
+          </fieldset>
+        </div>
+      </section>
+
+      <div class="flex gap-2">
+        <a routerLink="/profesor/videos" class="btn-ghost flex-1">Cancelar</a>
+        <button type="submit" class="btn-primary flex-1" [disabled]="saving() || loading()">
+          {{ saving() ? 'Guardando…' : isEdit() ? 'Guardar cambios' : 'Guardar video' }}
+        </button>
+      </div>
+    </aside>
+  </form>
+</div>

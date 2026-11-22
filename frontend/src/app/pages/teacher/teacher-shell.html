@@ -1,0 +1,102 @@
+<div class="flex h-dvh overflow-hidden bg-white">
+  <!-- ── Sidebar ── -->
+  <aside class="hidden w-60 shrink-0 flex-col border-r border-line lg:flex">
+    <div class="flex h-14 items-center gap-2 border-b border-line px-4">
+      <app-logo link="/profesor" />
+    </div>
+    <p class="px-6 pt-4 pb-1 text-[10px] font-semibold tracking-wider text-ink-subtle uppercase">Panel del profesor</p>
+    <nav class="flex-1 space-y-0.5 px-3 py-1" aria-label="Panel del profesor">
+      @for (item of nav; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="!bg-primary-soft !font-semibold !text-primary [&_app-nav-icon]:!text-primary"
+          [routerLinkActiveOptions]="{ exact: item.exact }"
+          ariaCurrentWhenActive="page"
+          class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-ink-muted transition-colors hover:bg-surface"
+        >
+          <app-nav-icon [name]="item.icon" class="text-ink-faint" />
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+
+    <!-- Profesor activo -->
+    <div class="border-t border-line p-4">
+      @if (session.current(); as t) {
+        <div class="mb-2.5 flex items-center gap-2.5">
+          <span
+            class="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            [style.background-color]="t.avatarColor"
+            aria-hidden="true"
+          >
+            {{ initials(t.name) }}
+          </span>
+          <div class="min-w-0">
+            <p class="truncate text-xs font-semibold">{{ t.name }}</p>
+            <p class="truncate text-[11px] text-ink-subtle">{{ t.specialty }}</p>
+          </div>
+        </div>
+        <label class="sr-only" for="teacher-select">Cambiar de profesor</label>
+        <select
+          id="teacher-select"
+          class="field-input !py-1.5 text-xs"
+          [value]="t.id"
+          (change)="onSelect($event)"
+        >
+          @for (opt of session.teachers(); track opt.id) {
+            <option [value]="opt.id" [selected]="opt.id === t.id">{{ opt.name }}</option>
+          }
+        </select>
+        <p class="mt-1.5 text-[10px] leading-snug text-ink-subtle">Sin inicio de sesión todavía: elige con qué profesor trabajar.</p>
+      } @else if (session.loading()) {
+        <div class="flex items-center gap-2.5"><div class="skeleton size-8 rounded-full"></div><div class="skeleton h-3 flex-1"></div></div>
+      }
+    </div>
+  </aside>
+
+  <!-- ── Contenido ── -->
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <!-- Barra superior móvil -->
+    <header class="shrink-0 border-b border-line lg:hidden">
+      <div class="flex h-14 items-center justify-between px-4">
+        <app-logo link="/profesor" />
+        @if (session.current(); as t) {
+          <label class="sr-only" for="teacher-select-m">Cambiar de profesor</label>
+          <select id="teacher-select-m" class="field-input !w-auto max-w-44 !py-1 text-xs" (change)="onSelect($event)">
+            @for (opt of session.teachers(); track opt.id) {
+              <option [value]="opt.id" [selected]="opt.id === t.id">{{ opt.name }}</option>
+            }
+          </select>
+        }
+      </div>
+      <nav class="flex gap-1 overflow-x-auto px-3 pb-2" aria-label="Panel del profesor">
+        @for (item of nav; track item.path) {
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="!bg-primary-soft !text-primary !font-semibold"
+            [routerLinkActiveOptions]="{ exact: item.exact }"
+            class="rounded-lg px-3 py-1.5 text-xs whitespace-nowrap text-ink-muted"
+          >
+            {{ item.label }}
+          </a>
+        }
+      </nav>
+    </header>
+
+    <main id="main" class="flex-1 overflow-y-auto">
+      @if (session.error()) {
+        <div class="m-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-line bg-accent-soft p-4 text-sm text-accent" role="alert">
+          <span>{{ session.error() }}</span>
+          <button type="button" class="btn-ghost !py-1.5 text-xs" (click)="session.load()">Reintentar</button>
+        </div>
+      } @else if (session.current()) {
+        <router-outlet />
+      } @else if (!session.loading()) {
+        <div class="m-6 card p-6 text-sm text-ink-muted">
+          No hay profesores registrados. Ejecuta <code class="rounded bg-surface px-1.5 py-0.5 text-ink">npm run seed</code> en el backend.
+        </div>
+      }
+      <div class="h-16"></div>
+    </main>
+  </div>
+</div>

@@ -1,0 +1,204 @@
+<div class="flex h-dvh flex-col overflow-hidden bg-white">
+  <!-- ── Breadcrumb ── -->
+  <header class="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-line px-4 text-xs sm:px-5">
+    <nav class="flex min-w-0 items-center gap-1.5 text-ink-subtle" aria-label="Ruta">
+      <a routerLink="/inicio" class="shrink-0 text-secondary-text hover:underline">
+        ← {{ subject() ? levelLabel[subject()!.level] : 'Inicio' }}
+      </a>
+      @if (video(); as v) {
+        <span aria-hidden="true">·</span>
+        <span class="truncate">{{ v.unit?.subject?.name }}</span>
+        <span class="hidden sm:inline" aria-hidden="true">·</span>
+        <span class="hidden truncate sm:inline">Unidad {{ v.unit?.number }}: {{ v.unit?.title }}</span>
+      }
+    </nav>
+    <div class="flex shrink-0 items-center gap-3">
+      <span class="flex items-center gap-1.5 font-medium text-success-text" title="Racha actual">
+        <span aria-hidden="true">🔥</span><strong>12</strong><span class="sr-only">días de racha</span>
+      </span>
+      <span class="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">VM</span>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="m-6 rounded-xl border border-accent-line bg-accent-soft p-4 text-sm text-accent" role="alert">
+      {{ error() }} <a routerLink="/inicio" class="ml-2 font-semibold underline">Volver al inicio</a>
+    </div>
+  } @else {
+    <div class="flex flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <!-- Video + información -->
+      <main id="main" class="flex flex-col lg:flex-1 lg:overflow-y-auto">
+        @if (video(); as v) {
+          <app-video-player
+            [src]="v.videoUrl"
+            [title]="v.title"
+            [poster]="v.thumbnailUrl"
+            (started)="onStarted()"
+            (progressed)="onProgress($event)"
+            (completed)="onCompleted()"
+          />
+
+          <div class="px-4 py-5 sm:px-6">
+            <p class="mb-1.5 text-xs text-ink-subtle">
+              Lección {{ lessonIndex() + 1 }} de {{ lessons().length }} · {{ v.teacher?.name }}
+            </p>
+            <div class="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
+              <h1 class="font-display text-xl leading-snug font-bold text-balance">{{ v.title }}</h1>
+              <div class="flex shrink-0 items-center gap-2">
+                @if (progress.isWatched(v.id)) {
+                  <span class="rounded-md bg-success-soft px-2 py-1 text-xs font-medium text-success-text">Completada</span>
+                }
+                @if (nextLesson(); as next) {
+                  <a [routerLink]="['/clase', next.id]" class="btn-primary">
+                    Siguiente lección
+                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" aria-hidden="true">
+                      <path d="M1 5h10M7 1l4 4-4 4" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </a>
+                } @else {
+                  <a routerLink="/inicio" class="btn-ghost">Terminaste la materia</a>
+                }
+              </div>
+            </div>
+
+            <!-- Pestañas -->
+            <div class="flex overflow-x-auto border-b border-line" role="tablist" aria-label="Contenido de la lección">
+              @for (tab of tabs; track tab; let i = $index) {
+                <button
+                  type="button"
+                  role="tab"
+                  [id]="'tab-' + i"
+                  [attr.aria-selected]="activeTab() === tab"
+                  [attr.aria-controls]="'panel-' + i"
+                  [attr.tabindex]="activeTab() === tab ? 0 : -1"
+                  class="-mb-px border-b-2 px-4 py-2.5 text-sm whitespace-nowrap transition-colors"
+                  [class]="activeTab() === tab ? 'border-primary font-semibold text-primary' : 'border-transparent text-ink-subtle hover:text-ink'"
+                  (click)="selectTab(tab)"
+                  (keydown)="selectTab(tab, $event)"
+                >
+                  {{ tab }}
+                </button>
+              }
+            </div>
+
+            <div class="pt-5" role="tabpanel" [id]="'panel-' + tabs.indexOf(activeTab())" [attr.aria-labelledby]="'tab-' + tabs.indexOf(activeTab())">
+              @switch (activeTab()) {
+                @case ('Resumen') {
+                  <p class="max-w-[640px] text-sm leading-relaxed text-ink">{{ v.summary || 'Esta lección aún no tiene resumen.' }}</p>
+                }
+                @case ('Material descargable') {
+                  <div class="flex max-w-[640px] flex-col gap-2">
+                    @for (m of v.materials; track $index) {
+                      <a
+                        [href]="m.url"
+                        target="_blank"
+                        rel="noopener"
+                        class="flex items-center gap-3 rounded-lg border border-line p-3 hover:bg-surface"
+                      >
+                        <svg width="16" height="20" viewBox="0 0 16 20" fill="none" aria-hidden="true">
+                          <path d="M3 1h7l5 5v13H3V1z" stroke="#D1D5DB" stroke-width="1.2" fill="none" />
+                          <path d="M9 1v6h5" stroke="#D1D5DB" stroke-width="1.2" fill="none" />
+                          <path d="M5 11h6M5 14h4" stroke="#9CA3AF" stroke-width="1" stroke-linecap="round" />
+                        </svg>
+                        <span class="text-sm text-ink">{{ m.title }}</span>
+                        <span class="ml-auto text-xs text-secondary-text">Descargar</span>
+                      </a>
+                    } @empty {
+                      <p class="text-sm text-ink-subtle">Esta lección no tiene material descargable.</p>
+                    }
+                  </div>
+                }
+                @case ('Mis apuntes') {
+                  <label class="sr-only" for="notes">Mis apuntes</label>
+                  <textarea
+                    id="notes"
+                    name="notes"
+                    class="field-input h-32 max-w-[640px] resize-none"
+                    placeholder="Escribe tus apuntes aquí…"
+                    [value]="note()"
+                    (input)="onNoteInput($any($event.target).value)"
+                  ></textarea>
+                  <p class="field-help mt-1.5" aria-live="polite">
+                    {{ noteSaved() ? 'Guardado en este navegador.' : 'Tus apuntes se guardan automáticamente.' }}
+                  </p>
+                }
+                @case ('Preguntas') {
+                  <p class="text-sm text-ink-subtle">No hay preguntas aún. ¡Sé el primero en preguntar!</p>
+                }
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="aspect-video max-h-[420px] w-full animate-pulse bg-player"></div>
+          <div class="space-y-3 px-6 py-5">
+            <div class="skeleton h-3 w-40"></div>
+            <div class="skeleton h-6 w-2/3"></div>
+            <div class="skeleton h-4 w-full max-w-xl"></div>
+          </div>
+        }
+        <div class="h-16 shrink-0"></div>
+      </main>
+
+      <!-- ── Temario ── -->
+      <aside class="flex shrink-0 flex-col border-t border-line lg:w-72 lg:overflow-hidden lg:border-t-0 lg:border-l" aria-label="Temario">
+        <div class="shrink-0 border-b border-line p-4">
+          <h2 class="mb-2 font-display text-sm font-semibold">{{ subject()?.name ?? 'Cargando temario…' }}</h2>
+          <div class="mb-1.5 flex items-center justify-between text-xs">
+            <span class="text-ink-subtle">{{ subjectProgress().done }} de {{ subjectProgress().total }} lecciones</span>
+            <span class="tabular font-semibold text-ink">{{ subjectProgress().pct }}%</span>
+          </div>
+          <app-progress-bar [value]="subjectProgress().pct" color="var(--color-success)" [height]="4" label="Progreso de la materia" />
+        </div>
+
+        <div class="lg:flex-1 lg:overflow-y-auto">
+          @for (unit of subject()?.units ?? []; track unit.id) {
+            @if (unit.videos.length) {
+              <h3 class="px-4 pt-4 pb-1.5 text-[10px] font-semibold tracking-wider text-ink-subtle uppercase">
+                Unidad {{ unit.number }} · {{ unit.title }}
+              </h3>
+              <ul>
+                @for (lesson of unit.videos; track lesson.id) {
+                  @let st = status(lesson);
+                  <li>
+                    <a
+                      [routerLink]="['/clase', lesson.id]"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition-colors hover:bg-surface"
+                      [class.bg-primary-tint]="st === 'current'"
+                      [attr.aria-current]="st === 'current' ? 'page' : null"
+                    >
+                      @switch (st) {
+                        @case ('done') {
+                          <span class="flex size-4 shrink-0 items-center justify-center rounded-full bg-success" aria-label="Completada">
+                            <svg width="8" height="6" viewBox="0 0 8 6" fill="none" aria-hidden="true">
+                              <path d="M1 3l2.5 2.5L7 1" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </span>
+                        }
+                        @case ('current') {
+                          <span class="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary" aria-label="En curso">
+                            <svg width="6" height="8" viewBox="0 0 6 8" fill="none" aria-hidden="true"><path d="M1 1l4 3-4 3V1z" fill="white" /></svg>
+                          </span>
+                        }
+                        @default {
+                          <span class="size-4 shrink-0 rounded-full border-[1.5px] border-line-strong" aria-label="Pendiente"></span>
+                        }
+                      }
+                      <span
+                        class="flex-1 leading-snug"
+                        [class]="st === 'current' ? 'font-semibold text-primary' : st === 'done' ? 'text-ink' : 'text-ink-subtle'"
+                      >
+                        {{ lesson.title }}
+                      </span>
+                      <span class="tabular shrink-0 text-ink-subtle">{{ formatDuration(lesson.durationSeconds) }}</span>
+                    </a>
+                  </li>
+                }
+              </ul>
+            }
+          }
+          <div class="h-16"></div>
+        </div>
+      </aside>
+    </div>
+  }
+</div>
